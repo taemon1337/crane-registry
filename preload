@@ -1,0 +1,29 @@
+#!/bin/sh
+
+ADDR=${ADDR:-":5000"}
+DATADIR=${DATADIR:-"/var/lib/registry"}
+MANIFEST=${MANIFEST:-"manifest.txt"}
+
+if [ ! -f "$MANIFEST" ]; then
+    echo "No manifest file found, aborting."
+    exit 1
+fi
+
+mkdir -p "$DATADIR"
+
+echo "starting crane registry..."
+crane registry serve --address "$ADDR" --disk "$DATADIR" --insecure & > /dev/null
+
+sleep 5
+
+echo "pulling and pushing images..."
+while read -r image; do
+    echo "preloading $image"
+    crane pull "$image" "$image".img
+    crane push "$image".img localhost"$ADDR/"$image"
+    rm "$image".img
+done < "$MANIFEST"
+
+killall crane
+
+echo "done"
