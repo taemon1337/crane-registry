@@ -1,14 +1,17 @@
-FROM alpine/crane:latest
+FROM alpine/crane:latest AS crane
+FROM alpine/helm:latest AS helm
+FROM registry:2
 
 VOLUME /var/lib/registry
 EXPOSE 5000
 
 WORKDIR /tmp
 
-COPY ./*.txt .
+COPY --from=crane /usr/bin/crane /usr/bin/crane
+COPY --from=helm /usr/bin/helm /usr/bin/helm
+
+COPY ./config.yml /etc/docker/registry/config.yml
+COPY ./manifests/*.txt .
 COPY ./preload .
 
 RUN ./preload
-
-ENTRYPOINT ["crane", "registry", "serve"]
-CMD ["--address", ":5000", "--disk", "/var/lib/registry", "--insecure"]

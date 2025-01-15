@@ -1,0 +1,21 @@
+# Spegel images
+ghcr.io/spegel-org/spegel:v0.0.29
+
+# Traefik
+traefik:2.10.4
+
+# Longhorn Components
+longhornio/csi-attacher:v4.7.0
+longhornio/livenessprobe:v2.14.0
+longhornio/csi-node-driver-registrar:v2.12.0
+longhornio/csi-provisioner:v4.0.1-20241007
+longhornio/csi-snapshotter:v7.0.2-20241007
+longhornio/backing-image-manager:v1.7.2-rc1
+longhornio/longhorn-engine:v1.7.2-rc1
+longhornio/longhorn-instance-manager:v1.7.2-rc1
+longhornio/longhorn-manager:v1.7.2-rc1
+longhornio/longhorn-ui:v1.7.2-rc1
+
+# metallb
+quay.io/metallb/controller:v0.14.9
+quay.io/metallb/speaker:v0.14.9

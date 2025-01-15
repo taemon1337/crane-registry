@@ -1,6 +1,6 @@
 PWD := $(shell pwd)
-IMAGE ?= crane-registry
-NAME := crane_registry
+IMAGE ?= preload-registry
+NAME := preload_registry
 PORT ?= 5000
 UID := $(shell id -u)
 GID := $(shell id -g)

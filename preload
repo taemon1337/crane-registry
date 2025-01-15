@@ -4,55 +4,98 @@ set -euo pipefail
 ADDR=${ADDR:-":5000"}
 DATADIR=${DATADIR:-"/var/lib/registry"}
 PLATFORM=${PLATFORM:-"linux/amd64"} # crane copy -h
-MANIFEST=${MANIFEST:-"manifest.txt"}
-K3S_MANIFEST=${K3S_MANIFEST:-"k3s-images.txt"}
 
-if [ ! -f "$MANIFEST" ]; then
-    echo "No manifest file found, aborting."
-    exit 1
-fi
+valid_line() {
+	local line="${@}"
+	if [[ -z "$line" ]] ; then
+		return 1 # empty line
+	elif echo $line | grep -q "^#" ; then
+		return 2 # comment line
+	else
+		return 0
+	fi
+}
+
+preload_manifest() {
+	local manifest="$1"
+	local manifest_type="$2"
+	echo "preloading ${manifest_type} from ${manifest}..."
+	while IFS= read -r line; do
+		if valid_line "${line}" ; then
+			case "${manifest_type}" in
+				container|image)
+					echo "preloading image '${line}'..."
+					preload_image ${line}
+					;;
+				helm|chart)
+					echo "preloading helm chart '${line}'..."
+					preload_chart ${line}
+					;;
+				*)
+					echo "invalid|unsupported manifest type: $manifest_type, exiting."
+					exit 2
+					;;
+			esac
+		else
+			continue # line should be skipped (comment or empty)
+		fi
+	done < "$manifest"
+	echo "completed $manifest"
+}
 
 preload_image() {
 	local image="$1"
-	local image_path="$(echo "$image" | sed 's/[/:]/_/g').img"
 	local image_url=localhost"$ADDR/$image"
-	local image_manifest="$(echo "$image" | sed 's/[/:]/_/g')-manifest.txt"
 
-	if [[ -z "$image" ]] ; then
-		echo "empty line"
-		continue # empty line
-	elif echo $image | grep -q "^#" ; then
-		echo "comment line"
-		continue # comment line
+	echo "preloading image $image"
+	crane copy "$image" "$image_url" --platform "${PLATFORM}"
+
+}
+
+preload_chart() {
+	if [ "$#" -ne 3 ]; then
+		echo "Invalid Helm Chart: must have 3 arguments: name, url, and version"
+		exit 1
+	fi
+
+	local chart="$1"
+	local chart_url="$2"
+	local chart_version="$3"
+	local chart_tgz="${chart}-${chart_version}.tgz"
+	local chart_dest=oci://localhost"$ADDR/$chart"
+
+	echo "preloading chart $chart"
+	if [[ "$chart_url" == oci://* ]]; then
+		echo "pulling oci chart $chart_url"
+		helm pull $chart_url --version $chart_version
 	else
-		echo "preloading $image"
-#		crane pull "$image" "$image_path"
-#		crane push "$image_path" "$image_url"
-#		rm "$image_path"
+		echo "adding chart repo $chart_url"
+		helm repo add $chart $chart_url
+		helm pull $chart/$chart --version $chart_version
+	fi
 
-		crane copy "$image" "$image_url" --platform "${PLATFORM}"
-		crane manifest "$image" > "$image_manifest"
-		# how to upload manifest to registry?
-    	fi
+	if [ -f "$chart_tgz" ]; then
+		helm push $chart_tgz $chart_dest
+		# helm pull oci://localhost:5000/traefik/traefik --version 34.0.0 --plain-http
+		rm $chart_tgz
+	else
+		ls -l
+		echo "could not pull $chart_url, failed."
+	fi
 
 }
 
 mkdir -p "$DATADIR"
 
-echo "starting crane registry..."
-crane registry serve --address "$ADDR" --disk "$DATADIR" --insecure &
+echo "starting registry..."
+registry serve /etc/docker/registry/config.yml &
 
 sleep 5
 
-echo "pulling and pushing images..."
-#while read -r image; do
-#	preload_image "$image"
-#done < "$K3S_MANIFEST"
+preload_manifest helm-charts.txt helm
+preload_manifest manifest.txt image
+preload_manifest k3s-manifest.txt image
 
-while read -r image; do
-	preload_image "$image"
-done < "$MANIFEST"
-
-killall crane
+killall registry
 
 echo "done"

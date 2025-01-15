@@ -1,0 +1,13 @@
+# Helm Charts by 'name url version'
+
+# spegel registry
+spegel oci://ghcr.io/spegel-org/helm-charts/spegel v0.0.29
+
+# traefik proxy
+traefik https://traefik.github.io/charts 34.0.0
+
+# longhorn storage provisioner
+longhorn https://charts.longhorn.io 1.7.2
+
+# metallb for LoadBalancer|IP provisioner
+metallb https://metallb.github.io/metallb 0.14.9
