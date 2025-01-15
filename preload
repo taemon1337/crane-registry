@@ -1,27 +1,56 @@
 #!/bin/sh
+set -euo pipefail
 
 ADDR=${ADDR:-":5000"}
 DATADIR=${DATADIR:-"/var/lib/registry"}
+PLATFORM=${PLATFORM:-"linux/amd64"} # crane copy -h
 MANIFEST=${MANIFEST:-"manifest.txt"}
+K3S_MANIFEST=${K3S_MANIFEST:-"k3s-images.txt"}
 
 if [ ! -f "$MANIFEST" ]; then
     echo "No manifest file found, aborting."
     exit 1
 fi
 
+preload_image() {
+	local image="$1"
+	local image_path="$(echo "$image" | sed 's/[/:]/_/g').img"
+	local image_url=localhost"$ADDR/$image"
+	local image_manifest="$(echo "$image" | sed 's/[/:]/_/g')-manifest.txt"
+
+	if [[ -z "$image" ]] ; then
+		echo "empty line"
+		continue # empty line
+	elif echo $image | grep -q "^#" ; then
+		echo "comment line"
+		continue # comment line
+	else
+		echo "preloading $image"
+#		crane pull "$image" "$image_path"
+#		crane push "$image_path" "$image_url"
+#		rm "$image_path"
+
+		crane copy "$image" "$image_url" --platform "${PLATFORM}"
+		crane manifest "$image" > "$image_manifest"
+		# how to upload manifest to registry?
+    	fi
+
+}
+
 mkdir -p "$DATADIR"
 
 echo "starting crane registry..."
-crane registry serve --address "$ADDR" --disk "$DATADIR" --insecure & > /dev/null
+crane registry serve --address "$ADDR" --disk "$DATADIR" --insecure &
 
 sleep 5
 
 echo "pulling and pushing images..."
+#while read -r image; do
+#	preload_image "$image"
+#done < "$K3S_MANIFEST"
+
 while read -r image; do
-    echo "preloading $image"
-    crane pull "$image" "$image".img
-    crane push "$image".img localhost"$ADDR/"$image"
-    rm "$image".img
+	preload_image "$image"
 done < "$MANIFEST"
 
 killall crane

@@ -5,7 +5,7 @@ EXPOSE 5000
 
 WORKDIR /tmp
 
-COPY ./manifest.txt .
+COPY ./*.txt .
 COPY ./preload .
 
 RUN ./preload
